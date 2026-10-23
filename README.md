@@ -1,3 +1,12 @@
+<p align="center">
+  <a href="https://gaitkit.com">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="media/gaitkit-dark.png">
+      <img src="media/gaitkit-light.png" alt="Gaitkit" width="360">
+    </picture>
+  </a>
+</p>
+
 # Gaitkit examples
 
 Working examples for [Gaitkit](https://gaitkit.com): low-poly 3D models written as code, many of which move. Creatures
