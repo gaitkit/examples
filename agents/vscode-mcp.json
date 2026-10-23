@@ -1,0 +1,5 @@
+{
+  "servers": {
+    "gaitkit": { "type": "http", "url": "https://gaitkit.com/mcp" }
+  }
+}

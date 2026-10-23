@@ -1,0 +1,99 @@
+<!doctype html>
+<!--
+  Two foxes walking a loop around a boulder, with procedural IK legs.
+  No build step: serve this folder (npx serve, python3 -m http.server …) and open it.
+  The fox, boulder and hedge are free Gaitkit models, loaded as ES modules from the CDN.
+-->
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Walking fox · Gaitkit + three.js</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #e9e4d8; overflow: hidden; font: 14px system-ui, sans-serif; }
+  #ui { position: fixed; left: 12px; bottom: 12px; display: flex; gap: 8px; }
+  #ui button { padding: 8px 12px; border: 1px solid #18211f; background: #f7f8f4; cursor: pointer; }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+} }
+</script>
+<div id="ui"><button id="coat">Coat: arctic</button><button id="speed">Speed: walk</button></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { createAsset as fox } from 'https://gaitkit.com/cdn/fox.mjs';
+import { createAsset as boulder } from 'https://gaitkit.com/cdn/boulder.mjs';
+import { createAsset as hedge } from 'https://gaitkit.com/cdn/hedge.mjs';
+import { walker } from 'https://gaitkit.com/runtime/walk.mjs';
+
+// renderer, light, ground
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#e9e4d8');
+scene.add(new THREE.HemisphereLight('#ffffff', '#8a8f80', 2.2));
+const sun = new THREE.DirectionalLight('#fff4e0', 2.4);
+sun.position.set(3, 6, 4); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -4, right: 4, top: 4, bottom: -4 });
+scene.add(sun);
+const ground = new THREE.Mesh(new THREE.CircleGeometry(6, 64), new THREE.MeshStandardMaterial({ color: '#b9c2a8' }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+const shadows = g => { g.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); return g; };
+
+// models: real-world scale in metres, resting on y = 0, front facing +Z, so nothing needs rescaling
+scene.add(shadows(boulder()));
+for (const x of [-2.3, 2.1]) { const h = shadows(hedge()); h.position.set(x, 0, -4.2); scene.add(h); }
+
+// knobs: every Gaitkit model is a function of typed parameters (see https://gaitkit.com/asset/fox for all of them)
+const COATS = ['arctic', 'red', 'silver', 'desert'];
+let coat = 0;
+const foxes = [
+  { knobs: () => ({ coat: COATS[coat], ears: 1.8 }), lag: 1.2 },
+  { knobs: () => ({}), lag: 0 },
+];
+function build(f) {
+  if (f.model) scene.remove(f.model);
+  f.model = shadows(fox(f.knobs()));
+  f.gait = walker(f.model);                 // turns distance walked into a leg pose (two-bone IK per leg)
+  scene.add(f.model);
+}
+foxes.forEach(build);
+
+// a closed path; the distance along it drives both the position and the legs
+const path = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(-1.3, 0, 0), new THREE.Vector3(0, 0, 1.1), new THREE.Vector3(1.3, 0, 0), new THREE.Vector3(0, 0, -1.1),
+], true);
+const length = path.getLength(), p = new THREE.Vector3(), t = new THREE.Vector3();
+
+const camera = new THREE.PerspectiveCamera(36, innerWidth / innerHeight, 0.05, 100);
+camera.position.set(0.4, 1.3, 3.4);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.25, -0.2);
+
+const SPEEDS = [['walk', 0.45], ['trot', 0.9], ['amble', 0.2]];
+let speed = 0, dist = 0;
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  dist += SPEEDS[speed][1] * Math.min(clock.getDelta(), 0.05);    // metres this frame
+  for (const f of foxes) {
+    const d = dist + f.lag, u = ((d / length) % 1 + 1) % 1;
+    path.getPointAt(u, p); path.getTangentAt(u, t);
+    f.model.position.copy(p);                    // 1. move the model
+    f.model.rotation.y = Math.atan2(t.x, t.z);   //    and face along the path (+Z is the front)
+    f.gait.poseAt(d);                            // 2. then pose the legs for the same distance
+  }
+  controls.update();
+  renderer.render(scene, camera);
+});
+
+document.getElementById('coat').onclick = e => { coat = (coat + 1) % COATS.length; build(foxes[0]); e.target.textContent = `Coat: ${COATS[coat]}`; };
+document.getElementById('speed').onclick = e => { speed = (speed + 1) % SPEEDS.length; e.target.textContent = `Speed: ${SPEEDS[speed][0]}`; };
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
+window.__ready = true;
+</script>
+</html>

@@ -1,0 +1,12 @@
+; Gaitkit example: an animated low-poly GLB in Godot 4.
+config_version=5
+
+[application]
+
+config/name="Gaitkit walking fox"
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.3")
+
+[rendering]
+
+anti_aliasing/quality/msaa_3d=2
